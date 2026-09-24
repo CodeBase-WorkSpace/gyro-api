@@ -1,58 +1,74 @@
 # Gyro API
 
-The Gyro API is a Kotlin and Spring Boot application backed by PostgreSQL and Redis. This directory owns everything
-required to build, test, and run the backend without files from the parent repository.
+Gyro API is the Kotlin and Spring Boot backend for Gyro's nutrition and health-tracking application. It provides the
+versioned HTTP API, authentication, food and meal data, goals, progress, notifications, subscriptions, and billing
+workflows used by [Gyro Web](https://github.com/CodeBase-WorkSpace/gyro-web).
 
-The application source is licensed under [AGPL-3.0-only](LICENSE). Read [the contribution guide](CONTRIBUTING.md)
-before proposing changes. The [trademark notice](TRADEMARKS.md) separates the software license from permission to
-present a fork as the official Gyro service.
+This repository is standalone: it includes the application source, PostgreSQL migrations, Redis-backed services,
+OpenAPI contract, tests, local Compose setup, and synthetic contributor fixtures.
 
-## Prerequisites
+## Stack
 
-- Java 25 toolchain
-- Docker with Compose
+- Kotlin and Spring Boot
+- PostgreSQL with Flyway migrations
+- Redis for selected runtime state and coordination
+- Gradle build and Testcontainers integration tests
+- OpenAPI contract at `openapi/openapi.json`
 
-## Run locally
+The application source is licensed under [AGPL-3.0-only](LICENSE). The Gyro name and service identity are governed by
+the separate [trademark notice](TRADEMARKS.md). Production configuration and credentials remain outside this
+repository.
 
-Create the untracked environment file and start PostgreSQL and Redis:
+## Quick start
+
+Prerequisites: Java 25 and Docker with Compose.
 
 ```bash
 cp .env.example .env
 docker compose up -d
-```
 
-Load the local environment and start Spring Boot:
-
-```bash
 set -a
 source .env
 set +a
 ./gradlew bootRun
 ```
 
-The API listens on `http://localhost:8080`. OpenAPI JSON is available at `http://localhost:8080/api-docs`, and Swagger
-UI is available at `http://localhost:8080/swagger-ui` in local development.
+The API listens on `http://localhost:8080`. In local development, OpenAPI JSON is available at
+`http://localhost:8080/api-docs` and Swagger UI at `http://localhost:8080/swagger-ui`.
 
-Stop local infrastructure without deleting its PostgreSQL volume:
-
-```bash
-docker compose stop
-```
-
-After the API has started once and Flyway has created the schema, optionally add a few clearly synthetic foods to the
-local Compose database:
+After Flyway creates the schema, load synthetic foods for a contributor journey:
 
 ```bash
 ./scripts/seed-contributor-demo.sh
 ```
 
-The fixture is idempotent and contains no user account, private data, or production catalog rows. Register a local
-account using the log-only verification codes, then search for `Example Oat Bowl` or `Example Lentil Soup`. Do not use
-the fixture as nutritional advice. The script only targets the named contributor database in this local Compose stack.
+The fixture is idempotent and inserts only `Example Oat Bowl` and `Example Lentil Soup`. It contains no user account,
+production data, or production catalog rows. Register a fresh local account through the web app using the log-only
+verification flow, then search for either example food.
 
-## Validate changes
+Stop local infrastructure without deleting its database volume:
 
-Run the immutable-migration check, tests, application build, and container build:
+```bash
+docker compose stop
+```
+
+## Local billing simulation
+
+PayPing is disabled in the contributor environment. Tests use `FakeBillingProvider`, and the development profile has
+an opt-in browser simulator:
+
+```bash
+# Add this to the ignored .env file, then restart the API.
+BILLING_DEMO_ENABLED=true
+```
+
+The simulator offers success, failure, and pending outcomes and follows the normal callback and verification path. It
+never charges a card or contacts PayPing. Its in-memory state resets when the API restarts.
+
+Production uses `PayPingBillingProvider` only when private deployment configuration enables it and supplies
+`PAYPING_API_KEY`. Never place provider credentials or production return URLs in this repository.
+
+## Validate a change
 
 ```bash
 ./scripts/verify-flyway-migration-immutability.sh
@@ -62,52 +78,25 @@ Run the immutable-migration check, tests, application build, and container build
 docker build -t gyro-api:local .
 ```
 
-Integration tests use Testcontainers and require Docker.
+Integration tests use Testcontainers and require Docker. Never edit a migration that already exists on `main`; add a
+new versioned migration instead.
 
-## API contract
+When a controller or DTO changes, run `./gradlew generateOpenApi`, review the contract diff, and rerun
+`./gradlew verifyOpenApi`. Coordinate any breaking or incompatible change with the frontend's pinned contract.
 
-`openapi/openapi.json` is the canonical, versioned HTTP contract. After changing a controller or DTO, run
-`./gradlew generateOpenApi`, review the artifact diff, and rerun `./gradlew verifyOpenApi`. The regular test suite also
-checks that the committed artifact matches the application. See [the API versioning policy](docs/api-versioning.md)
-before changing a published operation. The public CI template is checked in under `.github/workflows/` but remains
-disabled while ADR 0006 is in force.
+## Provider behavior in local development
 
-## Local provider behavior
-
-The checked-in example configuration cannot contact production providers:
+The contributor configuration keeps outbound services safe by default:
 
 | Capability | Local behavior |
 | --- | --- |
-| Signup and login verification | `log-only` adapters emit structured development events |
-| Billing | PayPing is disabled; tests use `FakeBillingProvider`, with an opt-in browser simulator for `dev` |
-| Product email and SMS notifications | Disabled |
+| Signup and login verification | Structured log-only adapters |
+| Billing | Fake provider in tests; opt-in browser simulator |
+| Product email and SMS | Disabled |
 | Web Push | Disabled until a local VAPID key pair is supplied |
-| Telegram delivery and account linking | Disabled |
+| Telegram delivery and linking | Disabled |
 
-Do not enable a real provider with production credentials in this repository. Keep local secrets in the ignored `.env`
-file and use the private operations repository for deployed configuration.
+## Contributing
 
-The example database account and password are disposable local values, not deployed credentials. The example omits
-`JWT_SECRET` and `VERIFICATION_CODE_PEPPER`; the `dev` profile supplies public, local-only fallbacks so the copied file
-runs immediately. Generate a fresh Base64 key of at least 32 bytes and configure it outside the repository for any
-shared environment. Keep the frontend's JWT issuer and audience equal to the API example values.
-
-By default, `FakeBillingProvider` returns a placeholder `pay.example.com` URL for automated tests; it never charges a
-card or calls PayPing. To test the browser payment journey locally, set `BILLING_DEMO_ENABLED=true` in your ignored
-`.env` and restart the API. With the `dev` profile and `PAYPING_ENABLED=false`, checkout instead opens a local page
-with success, failure, and pending choices. It uses a per-attempt opaque token and redirects through the normal
-callback and verification path, so the invoice and subscription transitions are exercised without a real payment.
-The simulator is disabled by default, absent in `prod`, and unavailable when PayPing is enabled. Its in-memory checkout
-state resets when the API restarts; create a new checkout after restarting.
-
-The production adapter is `PayPingBillingProvider` in this source tree. It is selected when `PAYPING_ENABLED=true` and
-requires a separately supplied `PAYPING_API_KEY`. In `prod`, if PayPing is off, `DisabledBillingProvider` rejects
-checkout; the fake is never selected. Provider credentials and production return URLs belong to private deployment
-configuration, not either public repository. Publishing this backend will publish the PayPing integration code, but
-not its credentials or operational configuration.
-
-## Database migrations
-
-Flyway migrations live under `src/main/resources/db/migration`. Never edit a migration that exists on `main`; create a
-new versioned migration. The verification script works both in this private monorepo and when `api/` becomes the root
-of the standalone public repository.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. For security reports, follow [SECURITY.md](SECURITY.md)
+instead of publishing exploit details in an issue.
