@@ -1,0 +1,21 @@
+# Explicit troubleshooting overrides.
+# Activate with SPRING_PROFILES_ACTIVE=dev,debug or --spring.profiles.active=dev,debug.
+spring:
+  config:
+    activate:
+      # Apply this file only when the debug profile is active.
+      on-profile: debug
+  jpa:
+    properties:
+      hibernate:
+        # Make SQL easier to inspect when SQL logging is deliberately enabled.
+        format_sql: true
+
+logging:
+  level:
+    # Enable Hibernate SQL only for explicit persistence troubleshooting.
+    org.hibernate.SQL: DEBUG
+    # Hibernate 6 bind parameter logger.
+    org.hibernate.orm.jdbc.bind: TRACE
+    # Hibernate 5 bind parameter logger retained for compatibility.
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

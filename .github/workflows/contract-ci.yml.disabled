@@ -1,0 +1,48 @@
+# Public gyro-api template. Keep disabled until ADR 0006 is revisited.
+name: API contract
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify generated OpenAPI artifact
+        run: ./gradlew --no-daemon verifyOpenApi
+      - name: Generate OpenAPI in a fresh process
+        run: |
+          ./gradlew --no-daemon generateOpenApi
+          git diff --exit-code -- openapi/openapi.json
+          sha256sum openapi/openapi.json | cut -d ' ' -f 1 > "$RUNNER_TEMP/openapi-first.sha256"
+      - name: Verify repeat generation is byte-identical
+        run: |
+          ./gradlew --no-daemon generateOpenApi
+          git diff --exit-code -- openapi/openapi.json
+          test "$(sha256sum openapi/openapi.json | cut -d ' ' -f 1)" = "$(cat "$RUNNER_TEMP/openapi-first.sha256")"
+      - name: Validate OpenAPI syntax and schemas
+        uses: oasdiff/oasdiff-action/validate@v0
+        with:
+          spec: openapi/openapi.json
+      - name: Reject breaking changes to the released contract
+        if: github.event_name == 'pull_request'
+        uses: oasdiff/oasdiff-action/breaking@v0
+        with:
+          base: 'origin/${{ github.base_ref }}:openapi/openapi.json'
+          revision: 'HEAD:openapi/openapi.json'
+          fail-on: ERR
+          review: false

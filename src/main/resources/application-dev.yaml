@@ -1,0 +1,71 @@
+# Local development overrides.
+# Activate with SPRING_PROFILES_ACTIVE=dev or --spring.profiles.active=dev.
+spring:
+  config:
+    activate:
+      # Apply this file only when the dev profile is active.
+      on-profile: dev
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:2s}
+  datasource:
+    # Local development database URL; Docker Compose overrides this to use the postgres service name.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gyro_dev}
+    # Local development database user.
+    username: ${DB_USERNAME:gyro}
+    # Local development database password.
+    password: ${DB_PASSWORD:gyro}
+
+  jpa:
+    properties:
+      hibernate:
+        # Make SQL easier to read during local debugging.
+        format_sql: true
+
+server:
+  error:
+    # Show validation and exception messages locally while building endpoints.
+    include-message: always
+    # Show binding errors locally for request validation work.
+    include-binding-errors: always
+
+management:
+  endpoint:
+    health:
+      # Show complete health details in local development.
+      show-details: always
+
+logging:
+  level:
+    # Use debug logs for application code during local development.
+    com.gyro.api: ${APP_LOG_LEVEL:DEBUG}
+    # Keep framework internals quiet in normal local development.
+    org.springframework: WARN
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+
+app:
+  admin-user-deletion:
+    enabled: true
+    enforce-elevated-controls: false
+  security:
+    verification-code-pepper: ${VERIFICATION_CODE_PEPPER:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+    jwt:
+      # Development-only fallback. Override JWT_SECRET outside local development.
+      secret: ${JWT_SECRET:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_EXPIRATION:15m}
+      refresh-token-ttl: ${JWT_REFRESH_TOKEN_EXPIRATION:30d}
+
+gyro:
+  email:
+    from: ${MAIL_FROM:dev@gyro.local}
+  verification:
+    email-provider: ${GYRO_VERIFICATION_EMAIL_PROVIDER:log-only}
+    sms-provider: ${GYRO_VERIFICATION_SMS_PROVIDER:log-only}
+    allow-code-logging: ${GYRO_VERIFICATION_ALLOW_CODE_LOGGING:true}

@@ -1,0 +1,20 @@
+package com.gyro.api.subscription.domain
+
+enum class SubscriptionTransitionType {
+    FIRST_PURCHASE,
+    RENEWAL,
+    GRACE_ENTRY,
+    GRACE_EXIT_SUCCESS,
+    GRACE_EXIT_FAILURE,
+    USER_CANCEL,
+    ADMIN_CANCEL_PERIOD_END,
+    ADMIN_TERMINATE,
+    ADMIN_GRANT,
+    ADMIN_GRANT_EXTEND,
+    ADMIN_REVOKE,
+    ADMIN_BILLING_BLOCK,
+    ADMIN_BILLING_UNBLOCK,
+    PERIOD_EXPIRED,
+    REFUND,
+    USER_RESTORE,
+}

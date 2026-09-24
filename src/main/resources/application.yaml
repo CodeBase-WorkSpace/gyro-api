@@ -1,0 +1,402 @@
+# Shared Spring Boot configuration.
+# Keep environment-specific values in application-dev.yaml or application-prod.yaml.
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 4
+  application:
+    # Service name used by logs, Actuator, and service discovery integrations.
+    name: api
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+      timeout: ${REDIS_TIMEOUT}
+  datasource:
+    # JDBC URL for the PostgreSQL database. Profiles provide environment defaults.
+    url: ${DB_URL}
+    # Database user. Profiles provide environment defaults.
+    username: ${DB_USERNAME}
+    # Database password. Profiles provide environment defaults.
+    password: ${DB_PASSWORD}
+    # Explicit PostgreSQL driver to avoid accidental driver inference changes.
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # Name shown in pool metrics and logs.
+      pool-name: GyroHikariPool
+      # Maximum database connections held by the API process.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      # Minimum idle connections kept ready for requests.
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      # Maximum time to wait when borrowing a database connection.
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
+      # Time an idle connection may sit in the pool before retirement.
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:600000}
+      # Maximum lifetime for a pooled connection before replacement.
+      max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
+
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  flyway:
+    # Flyway owns schema migrations.
+    enabled: true
+    # Standard location for versioned SQL migrations.
+    locations: classpath:db/migration
+    # Allow Flyway to take ownership if an existing empty schema is present.
+    baseline-on-migrate: true
+    # Fail startup if applied migrations differ from local migration files.
+    validate-on-migrate: true
+
+  jpa:
+    # Avoid lazy database work from the web layer after transactions complete.
+    open-in-view: false
+    hibernate:
+      # Validate entities against the migrated schema; never auto-create tables.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        # Keep SQL logs compact by default.
+        format_sql: false
+        jdbc:
+          # Persist timestamps consistently regardless of host timezone.
+          time_zone: UTC
+
+  jackson:
+    # Omit null JSON fields unless an endpoint intentionally includes them.
+    default-property-inclusion: non_null
+    # Serialize date/time values in UTC by default.
+    time-zone: UTC
+
+server:
+  # HTTP port used by the API container and local runs.
+  port: ${SERVER_PORT:8080}
+  # Let in-flight requests finish during shutdown.
+  shutdown: graceful
+  # Trust forwarding headers only when the deployment explicitly enables it.
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
+  error:
+    # Do not leak exception messages in default error responses.
+    include-message: never
+    # Do not expose validation binding internals from Spring's default handler.
+    include-binding-errors: never
+    # Never expose stack traces to API clients.
+    include-stacktrace: never
+
+management:
+  health:
+    mail:
+      # Disable SMTP connectivity checks for deployment health/readiness.
+      enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
+  endpoints:
+    web:
+      exposure:
+        # Publicly exposed Actuator endpoints; secure them before internet exposure.
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        # Enable Kubernetes/Docker-friendly liveness and readiness health groups.
+        enabled: true
+      # Show detailed health data only to authorized callers.
+      show-details: when_authorized
+  info:
+    env:
+      # Allow selected info.* environment-backed values to appear in /actuator/info.
+      enabled: true
+
+springdoc:
+  api-docs:
+    # OpenAPI JSON endpoint.
+    path: /api-docs
+  swagger-ui:
+    # Swagger UI endpoint for manual API exploration.
+    path: /swagger-ui
+    # Group operations by HTTP method for predictable browsing.
+    operations-sorter: method
+    # Sort tags alphabetically for stable generated UI output.
+    tags-sorter: alpha
+
+logging:
+  pattern:
+    # Stable, compact console logs for containers and local process output.
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n"
+  level:
+    # Default logging level for third-party libraries.
+    root: INFO
+    # Application package logging level.
+    com.gyro.api: ${APP_LOG_LEVEL:INFO}
+    # Keep framework internals quiet during normal development and production.
+    org.springframework: WARN
+    org.springframework.security: WARN
+    # Avoid logging SQL statements unless the debug profile is explicitly active.
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+
+gyro:
+  email:
+    from: ${MAIL_FROM:}
+  verification:
+    email-provider: ${GYRO_VERIFICATION_EMAIL_PROVIDER:log-only}
+    sms-provider: ${GYRO_VERIFICATION_SMS_PROVIDER:log-only}
+    allow-code-logging: ${GYRO_VERIFICATION_ALLOW_CODE_LOGGING:false}
+    sms-ir:
+      base-url: ${GYRO_VERIFICATION_SMS_IR_BASE_URL:https://api.sms.ir/v1}
+      api-key: ${GYRO_VERIFICATION_SMS_IR_API_KEY:}
+      signup:
+        template-id: ${GYRO_VERIFICATION_SMS_IR_SIGNUP_TEMPLATE_ID:258377}
+        parameter-name: ${GYRO_VERIFICATION_SMS_IR_SIGNUP_PARAMETER_NAME:Code}
+      login:
+        template-id: ${GYRO_VERIFICATION_SMS_IR_LOGIN_TEMPLATE_ID:123456}
+        parameter-name: ${GYRO_VERIFICATION_SMS_IR_LOGIN_PARAMETER_NAME:Code}
+      password-reset:
+        template-id: ${GYRO_VERIFICATION_SMS_IR_PASSWORD_RESET_TEMPLATE_ID:123456}
+        parameter-name: ${GYRO_VERIFICATION_SMS_IR_PASSWORD_RESET_PARAMETER_NAME:Code}
+      change-identifier:
+        template-id: ${GYRO_VERIFICATION_SMS_IR_CHANGE_IDENTIFIER_TEMPLATE_ID:123456}
+        parameter-name: ${GYRO_VERIFICATION_SMS_IR_CHANGE_IDENTIFIER_PARAMETER_NAME:Code}
+    kavenegar:
+      base-url: ${GYRO_VERIFICATION_KAVENEGAR_BASE_URL:https://api.kavenegar.com/v1}
+      api-key: ${GYRO_VERIFICATION_KAVENEGAR_API_KEY:}
+      signup:
+        template: ${GYRO_VERIFICATION_KAVENEGAR_SIGNUP_TEMPLATE:welcomeotp}
+      login:
+        template: ${GYRO_VERIFICATION_KAVENEGAR_LOGIN_TEMPLATE:welcomeotp}
+      password-reset:
+        template: ${GYRO_VERIFICATION_KAVENEGAR_PASSWORD_RESET_TEMPLATE:passwordotp}
+      change-identifier:
+        template: ${GYRO_VERIFICATION_KAVENEGAR_CHANGE_IDENTIFIER_TEMPLATE:welcomeotp}
+
+app:
+  http:
+    # Only these direct peers may supply Nginx's private, overwritten client-IP header.
+    # Leave empty outside a deployment with a documented reverse-proxy boundary.
+    trusted-proxy-cidrs: ${APP_TRUSTED_PROXY_CIDRS:}
+  notification:
+    jobs-enabled: ${NOTIFICATION_JOBS_ENABLED:true}
+    poll-delay: ${NOTIFICATION_POLL_DELAY:5s}
+    metrics-refresh-delay: ${NOTIFICATION_METRICS_REFRESH_DELAY:60s}
+    batch-size: ${NOTIFICATION_BATCH_SIZE:50}
+    claim-duration: ${NOTIFICATION_CLAIM_DURATION:1m}
+    worker-identity: ${NOTIFICATION_WORKER_IDENTITY:${HOSTNAME:local}}
+    content-retention: ${NOTIFICATION_CONTENT_RETENTION:30d}
+    endpoint-fingerprint-key: ${NOTIFICATION_ENDPOINT_FINGERPRINT_KEY:gyro-development-notification-fingerprint-key}
+    email-enabled: ${NOTIFICATION_EMAIL_ENABLED:false}
+    telegram-enabled: ${NOTIFICATION_TELEGRAM_ENABLED:false}
+    telegram-api-base-url: ${NOTIFICATION_TELEGRAM_API_BASE_URL:https://api.telegram.org}
+    telegram-bot-token: ${NOTIFICATION_TELEGRAM_BOT_TOKEN:}
+    telegram-chat-id: ${NOTIFICATION_TELEGRAM_CHAT_ID:}
+    telegram-linking-enabled: ${NOTIFICATION_TELEGRAM_LINKING_ENABLED:false}
+    telegram-bot-username: ${NOTIFICATION_TELEGRAM_BOT_USERNAME:}
+    telegram-webhook-secret: ${NOTIFICATION_TELEGRAM_WEBHOOK_SECRET:}
+    telegram-webhook-url: ${NOTIFICATION_TELEGRAM_WEBHOOK_URL:}
+    telegram-endpoint-encryption-key: ${NOTIFICATION_TELEGRAM_ENDPOINT_ENCRYPTION_KEY:dGVsZWdyYW0tZGV2ZWxvcG1lbnQta2V5LTMyYnl0ZSE=}
+    telegram-link-token-ttl: ${NOTIFICATION_TELEGRAM_LINK_TOKEN_TTL:10m}
+    telegram-unclaimed-link-code-retention: ${NOTIFICATION_TELEGRAM_UNCLAIMED_LINK_CODE_RETENTION:1h}
+    telegram-link-data-retention: ${NOTIFICATION_TELEGRAM_LINK_DATA_RETENTION:7d}
+    telegram-cleanup-batch-size: ${NOTIFICATION_TELEGRAM_CLEANUP_BATCH_SIZE:500}
+    telegram-timeout: ${NOTIFICATION_TELEGRAM_TIMEOUT:10s}
+    # This proxy is intentionally adapter-scoped. It routes Telegram and Web Push without
+    # changing JVM-wide networking for payment, SMS, email, or other provider clients.
+    egress-proxy-type: ${NOTIFICATION_EGRESS_PROXY_TYPE:NONE}
+    egress-proxy-host: ${NOTIFICATION_EGRESS_PROXY_HOST:}
+    egress-proxy-port: ${NOTIFICATION_EGRESS_PROXY_PORT:0}
+    egress-proxy-username: ${NOTIFICATION_EGRESS_PROXY_USERNAME:}
+    egress-proxy-password: ${NOTIFICATION_EGRESS_PROXY_PASSWORD:}
+    product-sms-enabled: ${NOTIFICATION_PRODUCT_SMS_ENABLED:false}
+    product-sms-base-url: ${NOTIFICATION_PRODUCT_SMS_BASE_URL:https://api.sms.ir/v1}
+    product-sms-api-key: ${NOTIFICATION_PRODUCT_SMS_API_KEY:}
+    product-sms-line-number: ${NOTIFICATION_PRODUCT_SMS_LINE_NUMBER:}
+    product-sms-mandatory-user-daily-cap: ${NOTIFICATION_PRODUCT_SMS_MANDATORY_USER_DAILY_CAP:5}
+    product-sms-daily-global-cap: ${NOTIFICATION_PRODUCT_SMS_DAILY_GLOBAL_CAP:500}
+    push-subscription-encryption-key: ${NOTIFICATION_PUSH_SUBSCRIPTION_ENCRYPTION_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
+    web-push-enabled: ${NOTIFICATION_WEB_PUSH_ENABLED:false}
+    web-push-public-key: ${NOTIFICATION_WEB_PUSH_PUBLIC_KEY:}
+    web-push-private-key: ${NOTIFICATION_WEB_PUSH_PRIVATE_KEY:}
+    web-push-subject: ${NOTIFICATION_WEB_PUSH_SUBJECT:mailto:info@gyrohealth.ir}
+    web-push-allowed-endpoint-hosts: ${NOTIFICATION_WEB_PUSH_ALLOWED_ENDPOINT_HOSTS:fcm.googleapis.com,updates.push.services.mozilla.com,push.services.mozilla.com,web.push.apple.com,.notify.windows.com}
+    web-push-max-subscriptions-per-user: ${NOTIFICATION_WEB_PUSH_MAX_SUBSCRIPTIONS_PER_USER:10}
+    web-push-timeout: ${NOTIFICATION_WEB_PUSH_TIMEOUT:10s}
+  auth:
+    verification-code-ttl: ${AUTH_VERIFICATION_CODE_TTL:10m}
+    pending-registration-cleanup-cron: ${PENDING_REGISTRATION_CLEANUP_CRON:0 */15 * * * *}
+    password-reset-code-ttl: ${AUTH_PASSWORD_RESET_CODE_TTL:10m}
+    refresh-token-cleanup-cron: ${REFRESH_TOKEN_CLEANUP_CRON:0 0 * * * *}
+    revoked-token-retention: ${REVOKED_TOKEN_RETENTION:7d}
+    # Let concurrent requests reuse a just-rotated token briefly so one access-token expiry
+    # cannot invalidate an otherwise healthy browser session.
+    refresh-token-rotation-grace: ${REFRESH_TOKEN_ROTATION_GRACE:30s}
+  idempotency:
+    ttl: ${IDEMPOTENCY_KEY_TTL:24h}
+    cleanup-cron: ${IDEMPOTENCY_KEY_CLEANUP_CRON:0 15 * * * *}
+  billing:
+    return-url: ${BILLING_RETURN_URL:https://api.gyrohealth.ir/api/v1/billing/payping/callback}
+    frontend-return-url: ${BILLING_FRONTEND_RETURN_URL:https://app.gyrohealth.ir/profile/billing/verify}
+    checkout-enabled: ${BILLING_CHECKOUT_ENABLED:true}
+    demo:
+      enabled: ${BILLING_DEMO_ENABLED:false}
+    payping:
+      enabled: ${PAYPING_ENABLED:false}
+      base-url: ${PAYPING_BASE_URL:https://api.payping.ir}
+      api-key: ${PAYPING_API_KEY:}
+      provider-amount-override-toman: ${PAYPING_PROVIDER_AMOUNT_OVERRIDE_TOMAN:}
+      report-enabled: ${PAYPING_REPORT_ENABLED:false}
+      reconciliation-enabled: ${PAYPING_RECONCILIATION_ENABLED:true}
+      reconciliation-delay: ${PAYPING_RECONCILIATION_DELAY:300000}
+      reconciliation-max-age: ${PAYPING_RECONCILIATION_MAX_AGE:15m}
+      reconciliation-max-retries: ${PAYPING_RECONCILIATION_MAX_RETRIES:3}
+      reconciliation-batch-size: ${PAYPING_RECONCILIATION_BATCH_SIZE:50}
+    lifecycle:
+      jobs-enabled: ${BILLING_LIFECYCLE_JOBS_ENABLED:true}
+      batch-size: ${BILLING_LIFECYCLE_BATCH_SIZE:100}
+      period-expiry-delay: ${BILLING_PERIOD_EXPIRY_DELAY:300000}
+      grace-exit-delay: ${BILLING_GRACE_EXIT_DELAY:300000}
+      stale-attempt-delay: ${BILLING_STALE_ATTEMPT_DELAY:900000}
+      stale-attempt-age: ${BILLING_STALE_ATTEMPT_AGE:60m}
+      renewal-reminder-cron: ${BILLING_RENEWAL_REMINDER_CRON:0 30 6 * * *}
+      renewal-reminder-days: ${BILLING_RENEWAL_REMINDER_DAYS:3}
+      outbox-publish-delay: ${BILLING_OUTBOX_PUBLISH_DELAY:5000}
+      outbox-max-retries: ${BILLING_OUTBOX_MAX_RETRIES:5}
+      outbox-cleanup-cron: ${BILLING_OUTBOX_CLEANUP_CRON:0 45 4 * * *}
+      outbox-retention: ${BILLING_OUTBOX_RETENTION:7d}
+  seed:
+    enabled: ${SEED_ENABLED:true}
+    lock-timeout-seconds: ${SEED_LOCK_TIMEOUT_SECONDS:5}
+  plan-limits:
+    free-custom-foods: ${PLAN_LIMIT_FREE_CUSTOM_FOODS:2}
+    free-custom-meals: ${PLAN_LIMIT_FREE_CUSTOM_MEALS:2}
+  admin-user-deletion:
+    rate-limit: ${ADMIN_USER_DELETION_RATE_LIMIT:30}
+    rate-window: ${ADMIN_USER_DELETION_RATE_WINDOW:1h}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    login:
+      per-ip-limit: ${RATE_LIMIT_LOGIN_PER_IP:20}
+      per-identifier-limit: ${RATE_LIMIT_LOGIN_PER_IDENTIFIER:10}
+      window: ${RATE_LIMIT_LOGIN_WINDOW:15m}
+    register:
+      per-ip-limit: ${RATE_LIMIT_REGISTER_PER_IP:10}
+      per-contact-limit: ${RATE_LIMIT_REGISTER_PER_CONTACT:3}
+      window: ${RATE_LIMIT_REGISTER_WINDOW:1h}
+    promotion:
+      validate-per-ip-limit: ${RATE_LIMIT_PROMOTION_VALIDATE_PER_IP:30}
+      validate-per-user-limit: ${RATE_LIMIT_PROMOTION_VALIDATE_PER_USER:30}
+      redeem-per-ip-limit: ${RATE_LIMIT_PROMOTION_REDEEM_PER_IP:10}
+      redeem-per-user-limit: ${RATE_LIMIT_PROMOTION_REDEEM_PER_USER:5}
+      window: ${RATE_LIMIT_PROMOTION_WINDOW:15m}
+    web-push:
+      subscribe-per-user-limit: ${RATE_LIMIT_WEB_PUSH_SUBSCRIBE_PER_USER:20}
+      test-per-user-limit: ${RATE_LIMIT_WEB_PUSH_TEST_PER_USER:5}
+      window: ${RATE_LIMIT_WEB_PUSH_WINDOW:15m}
+    nutrition-coach:
+      impressions-per-user-limit: ${RATE_LIMIT_NUTRITION_COACH_IMPRESSIONS_PER_USER:60}
+      window: ${RATE_LIMIT_NUTRITION_COACH_WINDOW:15m}
+    telegram:
+      link-per-user-limit: ${RATE_LIMIT_TELEGRAM_LINK_PER_USER:5}
+      link-window: ${RATE_LIMIT_TELEGRAM_LINK_WINDOW:1h}
+      confirm-per-user-limit: ${RATE_LIMIT_TELEGRAM_CONFIRM_PER_USER:5}
+      confirm-per-ip-limit: ${RATE_LIMIT_TELEGRAM_CONFIRM_PER_IP:20}
+      confirm-window: ${RATE_LIMIT_TELEGRAM_CONFIRM_WINDOW:15m}
+      test-per-user-limit: ${RATE_LIMIT_TELEGRAM_TEST_PER_USER:3}
+      test-window: ${RATE_LIMIT_TELEGRAM_TEST_WINDOW:10m}
+  observability:
+    # Dedicated token accepted only by the Prometheus scrape endpoint. The local
+    # default is safe only for the local Docker profile; production requires an
+    # injected secret in application-prod.yaml.
+    metrics-token: ${OBSERVABILITY_METRICS_TOKEN:local-observability-token}
+  api:
+    # Canonical REST API base path planned by the backend contract.
+    base-path: /api/v1
+  user-preferences:
+    # Default IANA timezone for new profiles when users have not chosen one.
+    default-timezone: ${APP_DEFAULT_TIMEZONE:Asia/Tehran}
+    # Default BCP 47 locale for new profiles when users have not chosen one.
+    default-locale: ${APP_DEFAULT_LOCALE:fa-IR}
+  goal-recalibration:
+    # Weekly suggest-and-confirm goal recalibration from weight trend.
+    jobs-enabled: ${GOAL_RECALIBRATION_JOBS_ENABLED:true}
+    # Daily sweep. Per-user spacing is enforced by RecalibrationService.MIN_INTERVAL
+    # (7 days), not by this schedule — running daily only cuts delivery latency.
+    cron: ${GOAL_RECALIBRATION_CRON:0 30 5 * * *}
+    batch-size: ${GOAL_RECALIBRATION_BATCH_SIZE:200}
+    # Evaluate immediately after a weigh-in commits instead of waiting for the sweep.
+    # Off by default: this moves suggestion generation into the user-facing weight-write
+    # path, so it should be switched on deliberately once the estimator and confidence
+    # tiers have been watched through the scheduled sweep. The sweep is the durable
+    # backstop either way, so leaving this off only restores the previous latency.
+    trigger-on-weigh-in-enabled: ${GOAL_RECALIBRATION_TRIGGER_ON_WEIGH_IN:false}
+  nutrition-coach:
+    enabled: ${NUTRITION_COACH_ENABLED:true}
+    locked-recommendation-enabled: ${NUTRITION_COACH_LOCKED_RECOMMENDATION_ENABLED:true}
+    # Enable only after frontend support for NO_CHANGE_RECOMMENDED has reached
+    # installed PWA clients. Until then, withheld changes use the neutral INSIGHTS state.
+    no-change-state-enabled: ${NUTRITION_COACH_NO_CHANGE_STATE_ENABLED:false}
+    # Mutation events evict immediately; this TTL is the bounded safety net.
+    cache-ttl: ${NUTRITION_COACH_CACHE_TTL:5m}
+    # Keep one prior rendered state recordable after a live rerank.
+    impression-issuance-ttl: ${NUTRITION_COACH_IMPRESSION_ISSUANCE_TTL:10m}
+  goal-schedules:
+    # Keep the flag available for controlled rollout while allowing paid users
+    # to reach entitlement validation by default.
+    premium-goal-schedules-enabled: ${PREMIUM_GOAL_SCHEDULES_ENABLED:true}
+  premium-gating:
+    disabled: ${PREMIUM_GATING_DISABLED:false}
+    free-future-diary-days: ${FREE_FUTURE_DIARY_DAYS:3}
+  trial:
+    # Self-serve reverse trial: signup auto-grant plus the one-time claim
+    # endpoint for existing free users. One redemption per account and per
+    # normalized contact identifier.
+    enabled: ${TRIAL_ENABLED:true}
+    days: ${TRIAL_DAYS:14}
+    plan-key: ${TRIAL_PLAN_KEY:ADVANCED}
+    # Dedicated HMAC pepper for the stored identifier hash. Falls back to the
+    # JWT secret only for local development; set a distinct value in prod.
+    identifier-pepper: ${TRIAL_IDENTIFIER_PEPPER:${JWT_SECRET}}
+    # Durable backstop for the after-commit signup grant (sweeps recent
+    # verified users without a redemption or subscription row).
+    reconciliation-enabled: ${TRIAL_RECONCILIATION_ENABLED:true}
+    reconciliation-delay: ${TRIAL_RECONCILIATION_DELAY:900000}
+    reconciliation-lookback-days: ${TRIAL_RECONCILIATION_LOOKBACK_DAYS:3}
+    reconciliation-batch-size: ${TRIAL_RECONCILIATION_BATCH_SIZE:200}
+  cors:
+    # Browser origins allowed to call the API.
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3002}
+    # HTTP methods accepted by the CORS policy.
+    allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+    # Request headers accepted by the CORS policy.
+    allowed-headers: Authorization,Content-Type,Idempotency-Key,X-Request-Id
+    # Allow browser credential flows when the security layer enables them.
+    allow-credentials: true
+  security:
+    verification-code-pepper: ${VERIFICATION_CODE_PEPPER:${JWT_SECRET}}
+    jwt:
+      # API-only legacy HMAC key. It may be removed after HS256 acceptance is disabled.
+      secret: ${JWT_SECRET:}
+      # Token issuer claim for access and refresh tokens.
+      issuer: ${APP_JWT_ISSUER:gyro-api}
+      # Audience claim checked by frontend local verification.
+      audience: ${APP_JWT_AUDIENCE:gyro}
+      # Optional P-256 pair. When configured, new tokens use ES256 while
+      # legacy HS256 tokens remain valid for the migration window.
+      ec-private-key: ${JWT_EC_PRIVATE_KEY:}
+      ec-public-key: ${JWT_EC_PUBLIC_KEY:}
+      # Temporary migration controls. Set an exact UTC cutoff only after every
+      # API instance issues ES256 tokens from the same deployed key pair.
+      legacy-hs256-enabled: ${JWT_LEGACY_HS256_ENABLED:true}
+      legacy-hs256-accept-until: ${JWT_LEGACY_HS256_ACCEPT_UNTIL:}
+      # Short-lived access token lifetime.
+      access-token-ttl: ${JWT_ACCESS_TOKEN_EXPIRATION:15m}
+      # Refresh token lifetime.
+      refresh-token-ttl: ${JWT_REFRESH_TOKEN_EXPIRATION:30d}

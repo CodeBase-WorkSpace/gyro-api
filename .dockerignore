@@ -1,0 +1,14 @@
+.gradle
+build
+.git
+.idea
+.vscode
+*.iml
+*.log
+*.md
+docs
+node_modules
+.env
+.env.*
+HELP.md
+gradlew.bat
