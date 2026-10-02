@@ -27,3 +27,4 @@ create index idx_daily_scores_user_date_desc
 
 create index idx_daily_scores_user_mode_date
     on daily_scores (user_id, mode, local_date);
+
